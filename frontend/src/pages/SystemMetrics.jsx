@@ -44,7 +44,7 @@ const SystemMetrics = () => {
   const statCards = [
     { name: 'API Latency', value: `${metrics.api.avgResponseTimeMs} ms`, icon: Zap, color: 'text-yellow-600', bg: 'bg-yellow-100' },
     { name: 'Active WebSockets', value: metrics.websockets.activeConnections, icon: Activity, color: 'text-blue-600', bg: 'bg-blue-100' },
-    { name: 'Redis Cache Hit Rate', value: `${metrics.redis.hitRate}%`, icon: Database, color: 'text-green-600', bg: 'bg-green-100' },
+    { name: 'Redis Cache Hit Rate', value: typeof metrics.redis.hitRate === 'number' ? `${metrics.redis.hitRate}%` : metrics.redis.hitRate, icon: Database, color: 'text-green-600', bg: 'bg-green-100' },
     { name: 'CPU Load (1m)', value: metrics.cpuLoad, icon: Server, color: 'text-purple-600', bg: 'bg-purple-100' },
   ];
 
@@ -152,7 +152,7 @@ const SystemMetrics = () => {
           
           <div>
             <p className="text-sm text-gray-500 font-medium mb-1">Redis Keyspace</p>
-            <p className="text-2xl font-bold text-gray-900">{metrics.redis.keys.toLocaleString()}</p>
+            <p className="text-2xl font-bold text-gray-900">{typeof metrics.redis.keys === 'number' ? metrics.redis.keys.toLocaleString() : metrics.redis.keys}</p>
             <p className="text-xs text-gray-400 mt-2">Total active keys in cache</p>
           </div>
 

@@ -1,5 +1,5 @@
 const os = require('os');
-const redisClient = require('../../config/redis');
+const { redis: redisClient, isAvailable } = require('../../config/redis');
 const socket = require('../../config/socket');
 
 exports.getSystemMetrics = async (req, res, next) => {
@@ -16,22 +16,29 @@ exports.getSystemMetrics = async (req, res, next) => {
     // Redis Stats
     let dbSize = 0;
     let hitRate = 100.0;
-    try {
-      dbSize = await redisClient.dbsize();
-      const info = await redisClient.info('stats');
-      if (info) {
-        const hitsMatch = info.match(/keyspace_hits:(\d+)/);
-        const missesMatch = info.match(/keyspace_misses:(\d+)/);
-        if (hitsMatch && missesMatch) {
-          const hits = parseInt(hitsMatch[1], 10);
-          const misses = parseInt(missesMatch[1], 10);
-          if (hits + misses > 0) {
-            hitRate = parseFloat(((hits / (hits + misses)) * 100).toFixed(2));
+    let redisStatus = 'Redis Connected';
+
+    if (isAvailable()) {
+      try {
+        dbSize = await redisClient.dbsize();
+        const info = await redisClient.info('stats');
+        if (info) {
+          const hitsMatch = info.match(/keyspace_hits:(\d+)/);
+          const missesMatch = info.match(/keyspace_misses:(\d+)/);
+          if (hitsMatch && missesMatch) {
+            const hits = parseInt(hitsMatch[1], 10);
+            const misses = parseInt(missesMatch[1], 10);
+            if (hits + misses > 0) {
+              hitRate = parseFloat(((hits / (hits + misses)) * 100).toFixed(2));
+            }
           }
         }
+      } catch (err) {
+        console.error('Redis metrics error:', err);
+        redisStatus = 'Redis Connection Error';
       }
-    } catch (err) {
-      console.error('Redis metrics error:', err);
+    } else {
+      redisStatus = 'Redis Disabled';
     }
 
     // WebSockets
@@ -58,8 +65,9 @@ exports.getSystemMetrics = async (req, res, next) => {
         },
         cpuLoad: parseFloat(loadAvg[0].toFixed(2)),
         redis: {
-          keys: dbSize,
-          hitRate: hitRate
+          status: redisStatus,
+          keys: isAvailable() ? dbSize : 'Redis Disabled',
+          hitRate: isAvailable() ? hitRate : 'Redis Disabled'
         },
         websockets: {
           activeConnections

@@ -1,4 +1,4 @@
-const redis = require('../config/redis');
+const { redis, isAvailable } = require('../config/redis');
 
 /**
  * Generates a dynamic cache key based on the prefix and the user's orgId
@@ -6,6 +6,14 @@ const redis = require('../config/redis');
  */
 const checkCache = (prefix) => {
   return async (req, res, next) => {
+    // If Redis is disabled or offline, bypass caching gracefully
+    if (!isAvailable()) {
+      res.sendCached = (data) => {
+        res.status(200).json(data);
+      };
+      return next();
+    }
+
     try {
       const orgId = req.user.orgId.toString();
       const cacheKey = `${prefix}:${orgId}`;
@@ -27,7 +35,10 @@ const checkCache = (prefix) => {
       next();
     } catch (error) {
       console.error('Redis Cache Middleware Error:', error);
-      // If Redis fails, gracefully fallback to executing the controller without caching
+      // Gracefully fallback to executing the controller without caching
+      res.sendCached = (data) => {
+        res.status(200).json(data);
+      };
       next();
     }
   };
@@ -39,6 +50,7 @@ const checkCache = (prefix) => {
  * @param {string} orgId - The organization ID
  */
 const clearCache = async (prefix, orgId) => {
+  if (!isAvailable()) return;
   try {
     const cacheKey = `${prefix}:${orgId}`;
     await redis.del(cacheKey);

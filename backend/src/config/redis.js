@@ -1,15 +1,42 @@
 const Redis = require('ioredis');
 
-// Connect to Redis. We'll use a local instance for now.
-// In production, this would be a Redis Cloud URL or similar.
-const redis = new Redis(process.env.REDIS_URI || 'redis://localhost:6379');
+let redis = null;
+let isRedisAvailable = false;
 
-redis.on('connect', () => {
-  console.log('Redis connected successfully');
-});
+const redisUri = process.env.REDIS_URI;
 
-redis.on('error', (err) => {
-  console.error('Redis connection error:', err);
-});
+if (redisUri) {
+  try {
+    redis = new Redis(redisUri, {
+      maxRetriesPerRequest: 1,
+      retryStrategy(times) {
+        if (times > 3) {
+          console.warn('[Redis] Max connection retries reached. Redis features will be disabled.');
+          isRedisAvailable = false;
+          return null; // Stop attempting reconnection
+        }
+        return 1000; // Retry after 1 second
+      }
+    });
 
-module.exports = redis;
+    redis.on('connect', () => {
+      isRedisAvailable = true;
+      console.log('Redis connected successfully');
+    });
+
+    redis.on('error', (err) => {
+      console.error('[Redis] Connection error:', err.message);
+      isRedisAvailable = false;
+    });
+  } catch (err) {
+    console.error('[Redis] Failed to initialize client:', err.message);
+    isRedisAvailable = false;
+  }
+} else {
+  console.log('[Redis] Caching disabled: REDIS_URI environment variable is missing.');
+}
+
+module.exports = {
+  redis,
+  isAvailable: () => isRedisAvailable && redis && redis.status === 'ready'
+};
