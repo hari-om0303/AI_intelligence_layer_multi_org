@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, Activity, Zap, Trash2, Edit2, ShieldAlert } from 'lucide-react';
+import { X, Calendar, Activity, Zap, Trash2, Edit2, ShieldAlert, Paperclip, Plus, Loader2, File as FileIcon } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
@@ -61,6 +61,59 @@ const ProjectDrawer = ({ project, isOpen, onClose, onUpdate, onDelete }) => {
     if (window.confirm("Are you sure you want to delete this project?")) {
       onDelete(project._id);
       onClose();
+    }
+  };
+
+  const [uploading, setUploading] = useState(false);
+
+  const handleUploadAttachment = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    const formDataUpload = new FormData();
+    formDataUpload.append('file', file);
+
+    try {
+      const uploadRes = await api.post('/upload', formDataUpload, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      const uploadedFile = uploadRes.data.data;
+
+      const updatedAttachments = [...(project.attachments || []), uploadedFile];
+
+      const res = await api.put(`/projects/${project._id}`, {
+        attachments: updatedAttachments
+      });
+
+      onUpdate(res.data.data);
+      toast.success('File attached successfully');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeleteAttachment = async (attachmentIdOrIndex) => {
+    if (!window.confirm('Remove this attachment?')) return;
+
+    try {
+      const updatedAttachments = (project.attachments || []).filter((att, index) => {
+        if (att._id) {
+          return att._id !== attachmentIdOrIndex;
+        }
+        return index !== attachmentIdOrIndex;
+      });
+
+      const res = await api.put(`/projects/${project._id}`, {
+        attachments: updatedAttachments
+      });
+
+      onUpdate(res.data.data);
+      toast.success('Attachment removed');
+    } catch (error) {
+      toast.error('Failed to remove attachment');
     }
   };
 
@@ -191,6 +244,65 @@ const ProjectDrawer = ({ project, isOpen, onClose, onUpdate, onDelete }) => {
                        </p>
                      )}
                    </div>
+                </section>
+
+                <hr className="border-gray-100" />
+
+                {/* Attachments Section */}
+                <section>
+                   <div className="flex items-center justify-between mb-4">
+                     <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider flex items-center">
+                       <Paperclip className="w-4 h-4 mr-1.5 text-indigo-500" /> Attachments
+                     </h3>
+                     {isAdmin && (
+                       <label className="text-indigo-600 text-xs font-semibold hover:text-indigo-700 cursor-pointer flex items-center">
+                         <Plus className="w-3.5 h-3.5 mr-1" /> Add File
+                         <input 
+                           type="file" 
+                           onChange={handleUploadAttachment} 
+                           className="hidden" 
+                         />
+                       </label>
+                     )}
+                   </div>
+
+                   {uploading && (
+                     <div className="flex items-center space-x-2 text-xs text-gray-500 mb-3 animate-pulse">
+                       <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500" />
+                       <span>Uploading attachment...</span>
+                     </div>
+                   )}
+
+                   {(!project.attachments || project.attachments.length === 0) ? (
+                     <p className="text-xs text-gray-500 bg-gray-50 p-3 rounded-xl border border-dashed border-gray-200 text-center">
+                       No files attached to this project.
+                     </p>
+                   ) : (
+                     <div className="space-y-2">
+                       {project.attachments.map((file, i) => (
+                         <div key={i} className="flex items-center justify-between p-3 bg-gray-50 hover:bg-indigo-50/30 border border-gray-100 rounded-xl transition-all">
+                           <a 
+                             href={file.url.startsWith('/') ? `${api.defaults.baseURL.replace('/api', '')}${file.url}` : file.url} 
+                             target="_blank" 
+                             rel="noopener noreferrer"
+                             className="flex items-center space-x-2 truncate hover:underline text-sm font-medium text-gray-700"
+                           >
+                             <FileIcon className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+                             <span className="truncate max-w-[200px]">{file.name}</span>
+                           </a>
+                           {isAdmin && (
+                             <button 
+                               onClick={() => handleDeleteAttachment(file._id || i)} 
+                               className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                               title="Delete Attachment"
+                             >
+                               <Trash2 className="w-3.5 h-3.5" />
+                             </button>
+                           )}
+                         </div>
+                       ))}
+                     </div>
+                   )}
                 </section>
 
                 <hr className="border-gray-100" />

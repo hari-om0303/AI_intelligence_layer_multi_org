@@ -55,6 +55,11 @@ const projectSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  attachments: [{
+    name: { type: String, required: true },
+    url: { type: String, required: true },
+    uploadedAt: { type: Date, default: Date.now }
+  }],
 }, { timestamps: true });
 
 // Compound index on orgId and createdAt for efficient pagination

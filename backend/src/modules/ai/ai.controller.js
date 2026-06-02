@@ -1,4 +1,4 @@
-const { generateRecommendations, parseNaturalLanguageQuery } = require('./ai.service');
+const { generateRecommendations, parseNaturalLanguageQuery, triageIssue } = require('./ai.service');
 const { getDashboardAnalytics } = require('../analytics/analytics.service');
 const Project = require('../project/project.model');
 
@@ -17,7 +17,8 @@ exports.postAIQuery = async (req, res, next) => {
     const { query } = req.body;
     if (!query) return res.status(400).json({ success: false, message: 'Missing query' });
 
-    const filter = parseNaturalLanguageQuery(query);
+    // Wait for the async parser that queries Gemini
+    const filter = await parseNaturalLanguageQuery(query);
     
     // Always enforce org isolation
     filter.orgId = req.user.orgId;
@@ -29,10 +30,13 @@ exports.postAIQuery = async (req, res, next) => {
   }
 };
 
-exports.postAITriage = (req, res, next) => {
+exports.postAITriage = async (req, res, next) => {
   try {
     const { description } = req.body;
-    const triageResult = require('./ai.service').triageIssue(description);
+    if (!description) return res.status(400).json({ success: false, message: 'Missing description' });
+
+    // Wait for the async issue triager that queries Gemini
+    const triageResult = await triageIssue(description);
     res.status(200).json({ success: true, data: triageResult });
   } catch (error) {
     next(error);

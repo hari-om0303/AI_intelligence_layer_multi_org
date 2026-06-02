@@ -72,7 +72,7 @@ exports.getProjects = async (req, res, next) => {
 // @access  Private (ORG_ADMIN only)
 exports.createProject = async (req, res, next) => {
   try {
-    const { title, description, priority, type, dueDate, githubIssueUrl } = req.body;
+    const { title, description, priority, type, dueDate, githubIssueUrl, attachments } = req.body;
 
     if (!title) {
       return res.status(400).json({ success: false, message: 'Please provide a title' });
@@ -100,7 +100,8 @@ exports.createProject = async (req, res, next) => {
       orgId: req.user.orgId,
       createdBy: req.user._id,
       activityCount: 1,
-      lastActivityAt: Date.now()
+      lastActivityAt: Date.now(),
+      attachments: attachments || []
     });
 
     await logAudit('CREATE_PROJECT', req.user._id, req.user.orgId, { projectId: project._id, title });
@@ -131,7 +132,7 @@ exports.createProject = async (req, res, next) => {
 // @access  Private (ORG_ADMIN only)
 exports.updateProject = async (req, res, next) => {
   try {
-    const { title, description } = req.body;
+    const { title, description, attachments } = req.body;
 
     let project = await Project.findOne({ _id: req.params.id, orgId: req.user.orgId, isActive: true });
 
@@ -140,7 +141,8 @@ exports.updateProject = async (req, res, next) => {
     }
 
     project.title = title || project.title;
-    project.description = description || project.description;
+    project.description = description !== undefined ? description : project.description;
+    project.attachments = attachments || project.attachments;
     project.activityCount = (project.activityCount || 0) + 1;
     project.lastActivityAt = Date.now();
 

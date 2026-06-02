@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const path = require('path');
 
 const app = express();
 
@@ -8,6 +9,9 @@ const app = express();
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
+
+// Serve local uploads statically for development fallback
+app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
 // Basic health check route
 app.get('/api/health', (req, res) => {
@@ -24,6 +28,7 @@ const organizationRoutes = require('./modules/organization/organization.routes')
 const userRoutes = require('./modules/user/user.routes');
 const systemRoutes = require('./modules/system/system.routes');
 const intelligenceRoutes = require('./modules/intelligence/intelligence.routes');
+const uploadRoutes = require('./modules/upload/upload.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
@@ -34,6 +39,22 @@ app.use('/api/organizations', organizationRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/system', systemRoutes);
 app.use('/api/intelligence', intelligenceRoutes);
+app.use('/api/upload', uploadRoutes);
+
+// Serve frontend build in production
+if (process.env.NODE_ENV === 'production') {
+  const path = require('path');
+  const frontendPath = path.join(__dirname, '../../frontend/dist');
+  app.use(express.static(frontendPath));
+  
+  // Fallback to React index.html for SPA routing
+  app.get('*', (req, res, next) => {
+    if (req.originalUrl.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(frontendPath, 'index.html'));
+  });
+}
 
 // Global Error Handler
 app.use((err, req, res, next) => {
